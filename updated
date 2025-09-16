@@ -1,0 +1,2628 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HELEXIA UFV SECURITY MONITORING - MOVISAFE</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            background-color: #f0f0f0;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #005f4b, #007a63, #005f4b);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        #menu-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2000;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6));
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #menu-toggle:hover {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+            transform: scale(1.05);
+        }
+
+        .hamburger {
+            width: 25px;
+            height: 20px;
+            position: relative;
+            transform: rotate(0deg);
+            transition: .5s ease-in-out;
+            cursor: pointer;
+        }
+
+        .hamburger span {
+            display: block;
+            position: absolute;
+            height: 3px;
+            width: 100%;
+            background: white;
+            border-radius: 2px;
+            opacity: 1;
+            left: 0;
+            transform: rotate(0deg);
+            transition: .25s ease-in-out;
+        }
+
+        .hamburger span:nth-child(1) {
+            top: 0px;
+        }
+
+        .hamburger span:nth-child(2) {
+            top: 8px;
+        }
+
+        .hamburger span:nth-child(3) {
+            top: 16px;
+        }
+
+        .hamburger.active span:nth-child(1) {
+            top: 8px;
+            transform: rotate(135deg);
+        }
+
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+            left: -60px;
+        }
+
+        .hamburger.active span:nth-child(3) {
+            top: 8px;
+            transform: rotate(-135deg);
+        }
+
+        #whatsapp-action {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 2000;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            border: none;
+            padding: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #whatsapp-action:hover {
+            background: linear-gradient(135deg, #128C7E, #075E54);
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.6);
+        }
+
+        .whatsapp-icon {
+            width: 35px;
+            height: 35px;
+            fill: white;
+        }
+
+        /* MODAL BASE */
+        #emergency-modal,
+        #incident-modal,
+        #consult-modal,
+        #confirmation-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 3000;
+            /* Adjusted for stacking */
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-out;
+            overflow: auto;
+            /* Allow scrolling for modal content */
+        }
+
+        #incident-modal {
+            z-index: 4000;
+        }
+
+        #consult-modal {
+            z-index: 4500;
+        }
+
+        /* Consult higher than incident */
+        #confirmation-popup {
+            z-index: 5000;
+        }
+
+        /* Confirmation highest */
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        #emergency-modal.active,
+        #incident-modal.active,
+        #consult-modal.active,
+        #confirmation-popup.show {
+            display: flex;
+        }
+
+        .modal-content,
+        .incident-form-container,
+        .consult-container,
+        .confirmation-content {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        /* Specific adjustments for incident and consult modals */
+        .incident-form-container {
+            max-width: 600px;
+            max-height: 90vh;
+        }
+
+        .consult-container {
+            max-width: 1200px;
+            max-height: 95vh;
+        }
+
+        .confirmation-content {
+            max-width: 500px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header,
+        .incident-form-header,
+        .consult-header {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            padding: 20px;
+            margin: -30px -30px 25px -30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            text-transform: uppercase;
+            position: relative;
+        }
+
+        .incident-form-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+
+        .consult-header {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .emergency-contact {
+            background: linear-gradient(135deg, rgba(37, 211, 102, 0.1), rgba(18, 140, 126, 0.1));
+            border: 2px solid #25D366;
+            border-radius: 15px;
+            padding: 15px;
+            margin: 15px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .emergency-contact:hover {
+            background: linear-gradient(135deg, rgba(37, 211, 102, 0.2), rgba(18, 140, 126, 0.2));
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+        }
+
+        .contact-info {
+            flex: 1;
+        }
+
+        .contact-title {
+            font-weight: bold;
+            color: #128C7E;
+            font-size: 16px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .contact-number {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .whatsapp-mini-icon {
+            width: 25px;
+            height: 25px;
+            fill: #25D366;
+        }
+
+        /* Styles for tel: links */
+        .contact-number a,
+        .protocol-section a {
+            color: #007bff;
+            /* A distinct color for links */
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.2s ease;
+        }
+
+        .contact-number a:hover,
+        .protocol-section a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+
+        #sidebar {
+            position: absolute;
+            top: 0;
+            left: -350px;
+            width: 350px;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            transition: left 0.4s ease-in-out;
+            z-index: 1500;
+            backdrop-filter: blur(10px);
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #sidebar.open {
+            left: 0;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s ease;
+        }
+
+        #overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #search-container {
+            position: relative;
+            margin: 20px 0 30px 0;
+            padding-top: 60px;
+        }
+
+        #search {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        #search::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+            text-transform: uppercase;
+        }
+
+        #search:focus {
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+
+        #suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            transition: background 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Estilos para o botão de ocorrências */
+        .incident-btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 20px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .incident-btn:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        /* Estilos para o botão de consulta */
+        .consult-btn {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px 0 20px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        .consult-btn:hover {
+            background: linear-gradient(135deg, #0056b3, #004085);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        .filters-container {
+            background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), rgba(0, 86, 179, 0.05));
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            border: 2px solid rgba(0, 123, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.1);
+        }
+
+        .filters-title {
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-transform: uppercase;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-filter,
+        .btn-clear-filters {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            min-width: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-filter {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        .btn-filter:hover {
+            background: linear-gradient(135deg, #0056b3, #004085);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        .btn-clear-filters {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-clear-filters:hover {
+            background: linear-gradient(135deg, #5a6268, #495057);
+            transform: translateY(-2px);
+        }
+
+        .consult-actions {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .btn-export-all,
+        .btn-clear-all {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .btn-export-all:hover {
+            background: linear-gradient(135deg, #20c997, #17a2b8);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-export-all {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-clear-all {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .btn-clear-all:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .incidents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .incidents-table th {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            padding: 18px 15px;
+            text-align: left;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .incidents-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .incidents-table tr:hover {
+            background: rgba(0, 123, 255, 0.05);
+        }
+
+        .incidents-table tr:nth-child(even) {
+            background: rgba(248, 249, 250, 0.5);
+        }
+
+        .incidents-table tr:nth-child(even):hover {
+            background: rgba(0, 123, 255, 0.08);
+        }
+
+        .priority-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .priority-baixa {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .priority-media {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: #000;
+        }
+
+        .priority-alta {
+            background: linear-gradient(135deg, #fd7e14, #dc3545);
+            color: white;
+        }
+
+        .priority-critica {
+            background: linear-gradient(135deg, #dc3545, #bd2130);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            min-width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-view {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .btn-view:hover {
+            background: linear-gradient(135deg, #138496, #117a8b);
+            transform: scale(1.1);
+        }
+
+        .btn-export-single {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-export-single:hover {
+            background: linear-gradient(135deg, #20c997, #17a2b8);
+            transform: scale(1.1);
+        }
+
+        .btn-email-single {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-email-single:hover {
+            background: linear-gradient(135deg, #0056b3, #004085);
+            transform: scale(1.1);
+        }
+
+        .btn-delete {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            transform: scale(1.1);
+        }
+
+        .results-info {
+            margin: 15px 0;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), rgba(0, 86, 179, 0.05));
+            border-radius: 10px;
+            font-weight: bold;
+            color: #007bff;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 10px rgba(0, 123, 255, 0.1);
+        }
+
+        .no-incidents {
+            text-align: center;
+            padding: 60px 40px;
+            color: #666;
+            font-style: italic;
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            border-radius: 15px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #dc3545;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.2);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-save,
+        .btn-cancel,
+        .btn-export,
+        .btn-email {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: linear-gradient(135deg, #20c997, #17a2b8);
+            transform: translateY(-2px);
+        }
+
+        .btn-cancel {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: linear-gradient(135deg, #5a6268, #495057);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: linear-gradient(135deg, #0056b3, #004085);
+        }
+
+        .btn-email {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .btn-email:hover {
+            background: linear-gradient(135deg, #138496, #117a8b);
+        }
+
+        .export-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(220, 53, 69, 0.1);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .export-section.active {
+            display: block;
+        }
+
+        .accordion {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6));
+            color: white;
+            cursor: pointer;
+            padding: 15px;
+            width: 100%;
+            text-align: left;
+            border: none;
+            outline: none;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            font-weight: bold;
+            border-radius: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .accordion:hover {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+            transform: translateX(5px);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .panel {
+            padding: 0;
+            background: rgba(0, 0, 0, 0.3);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .panel ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .panel li {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s ease;
+            font-size: 13px;
+            text-transform: uppercase;
+            position: relative;
+        }
+
+        .panel li:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(8px);
+        }
+
+        .risk-indicator {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .risk-baixo {
+            background: #28a745;
+        }
+
+        .risk-moderado {
+            background: #ffc107;
+        }
+
+        .risk-alto {
+            background: #fd7e14;
+        }
+
+        .risk-critico {
+            background: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+            }
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: linear-gradient(135deg, #ffffff, #f0fff0);
+            border: 3px solid #005f4b;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .leaflet-popup-content {
+            width: 420px !important;
+            font-size: 14px;
+            line-height: 1.4;
+            margin: 15px;
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #005f4b, #00897b);
+            color: white;
+            padding: 12px;
+            margin: -15px -15px 15px -15px;
+            border-radius: 12px 12px 0 0;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .protocol-section {
+            margin: 10px 0;
+            padding: 12px;
+            border: 2px solid #00897b;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(0, 137, 123, 0.1), rgba(77, 182, 172, 0.1));
+        }
+
+        .protocol-title {
+            color: #005f4b;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .security-thermometer {
+            margin: 15px 0;
+            padding: 15px;
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(255, 193, 7, 0.1));
+        }
+
+        .thermometer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .thermometer-title {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .risk-level {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .risk-low {
+            background: #28a745;
+            color: white;
+        }
+
+        .risk-moderate {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .risk-high {
+            background: #fd7e14;
+            color: white;
+        }
+
+        .risk-critical {
+            background: #dc3545;
+            color: white;
+        }
+
+        .thermometer-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .thermometer-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s ease-in-out;
+            position: relative;
+        }
+
+        .thermometer-percentage {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .crime-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .crime-stat {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 6px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .crime-stat-value {
+            font-weight: bold;
+            color: #dc3545;
+        }
+
+        .protocol-button {
+            background: linear-gradient(135deg, #005f4b, #00897b);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        .protocol-button:hover {
+            background: linear-gradient(135deg, #00897b, #4db6ac);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 137, 123, 0.3);
+        }
+
+        /* POPUP DE CONFIRMAÇÃO */
+        #confirmation-popup {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        #confirmation-popup.show {
+            display: flex;
+        }
+
+        .confirmation-content {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            position: relative;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        .confirmation-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+            color: #28a745;
+        }
+
+        .confirmation-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #005f4b;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .confirmation-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .incident-id-display {
+            background: linear-gradient(135deg, #005f4b, #007a63);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .confirmation-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-ok,
+        .btn-view-records {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-ok:hover {
+            background: linear-gradient(135deg, #20c997, #17a2b8);
+            transform: translateY(-2px);
+        }
+
+        .btn-ok {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-view-records {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-view-records:hover {
+            background: linear-gradient(135deg, #0056b3, #004085);
+            transform: translateY(-2px);
+        }
+
+
+        /* RESPONSIVIDADE */
+        @media (max-width: 1024px) {
+            .consult-container {
+                width: 95vw;
+                padding: 20px;
+            }
+
+            .filters-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #whatsapp-action {
+                bottom: 20px;
+                right: 20px;
+                width: 60px;
+                height: 60px;
+                padding: 15px;
+            }
+
+            .whatsapp-icon {
+                width: 30px;
+                height: 30px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            .leaflet-popup-content {
+                width: 300px !important;
+            }
+
+            .consult-container {
+                width: 98vw;
+                padding: 15px;
+                max-height: 98vh;
+            }
+
+            .consult-header {
+                padding: 15px 20px;
+                margin: -15px -15px 20px -15px;
+                font-size: 16px;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .filter-actions,
+            .consult-actions {
+                flex-direction: column;
+            }
+
+            .btn-export-all,
+            .btn-clear-all,
+            .btn-filter,
+            .btn-clear-filters {
+                width: 100%;
+            }
+
+            .incidents-table {
+                font-size: 12px;
+            }
+
+            .incidents-table th,
+            .incidents-table td {
+                padding: 10px 8px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .incident-form-container {
+                width: 95%;
+                padding: 15px;
+                margin: 10px auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .consult-container {
+                padding: 12px;
+                border-radius: 15px;
+            }
+
+            .consult-header {
+                font-size: 14px;
+                padding: 12px 15px;
+                margin: -12px -12px 15px -12px;
+            }
+
+            .incidents-table th,
+            .incidents-table td {
+                padding: 8px 5px;
+                font-size: 11px;
+            }
+
+            .btn-action {
+                min-width: 30px;
+                height: 30px;
+                font-size: 11px;
+            }
+
+            .incident-form-container {
+                width: 98%;
+                padding: 12px;
+                margin: 5px auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="header">HELEXIA UFV SECURITY MONITORING - MOVISAFE</div>
+    <div id="container">
+        <div id="overlay"></div>
+
+        <button id="menu-toggle">
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </button>
+
+        <button id="whatsapp-action" title="Contatos de Emergência">
+            <svg class="whatsapp-icon" viewBox="0 0 24 24">
+                <path
+                    d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+            </svg>
+        </button>
+
+        <div id="emergency-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    🚨 CONTATOS DE EMERGÊNCIA
+                    <button class="close-modal" onclick="closeEmergencyModal()">&times;</button>
+                </div>
+
+                <div class="emergency-contact"
+                    onclick="openWhatsApp('5511190', '🚨 EMERGÊNCIA HELEXIA UFV SECURITY - Polícia Militar\n\nSolicitando apoio imediato para situação de segurança.\n\nAguardo retorno urgente.')">
+                    <div class="contact-info">
+                        <div class="contact-title">🚔 POLÍCIA MILITAR</div>
+                        <div class="contact-number"><a href="tel:190">190</a> - Emergência Geral</div>
+                    </div>
+                    <svg class="whatsapp-mini-icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                    </svg>
+                </div>
+
+                <div class="emergency-contact"
+                    onclick="openWhatsApp('5511193', '🚨 EMERGÊNCIA HELEXIA UFV SECURITY - Bombeiros\n\nSolicitando apoio imediato para situação de segurança.\n\nAguardo retorno urgente.')">
+                    <div class="contact-info">
+                        <div class="contact-title">🚒 BOMBEIROS</div>
+                        <div class="contact-number"><a href="tel:193">193</a> - Emergência e Resgate</div>
+                    </div>
+                    <svg class="whatsapp-mini-icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                    </svg>
+                </div>
+
+                <div class="emergency-contact"
+                    onclick="openWhatsApp('5511192', '🚨 EMERGÊNCIA HELEXIA UFV SECURITY - SAMU\n\nSolicitando apoio imediato para situação de segurança.\n\nAguardo retorno urgente.')">
+                    <div class="contact-info">
+                        <div class="contact-title">🚑 SAMU</div>
+                        <div class="contact-number"><a href="tel:192">192</a> - Emergência Médica</div>
+                    </div>
+                    <svg class="whatsapp-mini-icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                    </svg>
+                </div>
+
+                <div class="emergency-contact"
+                    onclick="openWhatsApp('5511197', '🚨 EMERGÊNCIA HELEXIA UFV SECURITY - Delegacia\n\nSolicitando apoio imediato para situação de segurança.\n\nAguardo retorno urgente.')">
+                    <div class="contact-info">
+                        <div class="contact-title">🏛️ DELEGACIA</div>
+                        <div class="contact-number"><a href="tel:197">197</a> - Polícia Civil</div>
+                    </div>
+                    <svg class="whatsapp-mini-icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                    </svg>
+                </div>
+
+                <div class="emergency-contact"
+                    onclick="openWhatsApp('551199887766', '🚨 EMERGÊNCIA HELEXIA UFV SECURITY - Central Helexia\n\nSolicitando apoio imediato para situação de segurança.\n\nAguardo retorno urgente.')">
+                    <div class="contact-info">
+                        <div class="contact-title">🛡️ CENTRAL HELEXIA</div>
+                        <div class="contact-number"><a href="tel:551199887766">(11) 99887-7766</a> - Segurança Corporativa
+                        </div>
+                    </div>
+                    <svg class="whatsapp-mini-icon" viewBox="0 0 24 24">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- POPUP DE CONFIRMAÇÃO -->
+        <div id="confirmation-popup" class="modal">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">✅</div>
+                <div class="confirmation-title">Ocorrência Registrada com Sucesso!</div>
+                <div class="confirmation-message">
+                    Sua ocorrência foi salva e está disponível para consulta.
+                </div>
+                <div id="incident-id-display" class="incident-id-display"></div>
+                <div class="confirmation-buttons">
+                    <button class="btn-ok" onclick="closeConfirmationPopup()">ENTENDI</button>
+                    <button class="btn-view-records" onclick="goToRecords()">VER REGISTROS</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sidebar">
+            <div id="search-container">
+                <input type="text" id="search" placeholder="Buscar site...">
+                <div id="suggestions"></div>
+            </div>
+
+            <!-- MODAL DE REGISTRO DE OCORRÊNCIA -->
+            <div id="incident-modal" class="modal">
+                <div class="incident-form-container">
+                    <div class="incident-form-header">
+                        📝 REGISTRO DE OCORRÊNCIA
+                        <button class="close-modal" onclick="closeIncidentModal()">&times;</button>
+                    </div>
+
+                    <form id="incident-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="operator-name">Nome do Operador *</label>
+                                <input type="text" id="operator-name" name="operatorName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="operator-shift">Turno *</label>
+                                <select id="operator-shift" name="operatorShift" required>
+                                    <option value="">Selecione o turno</option>
+                                    <option value="DIURNO">DIURNO (07:00 - 19:00)</option>
+                                    <option value="NOTURNO">NOTURNO (19:00 - 07:00)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="incident-site">Site da Ocorrência *</label>
+                                <select id="incident-site" name="incidentSite" required>
+                                    <option value="">Selecione o site</option>
+                                    <!-- Sites serão preenchidos via JavaScript -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="incident-type">Tipo de Ocorrência *</label>
+                                <select id="incident-type" name="incidentType" required>
+                                    <option value="">Selecione o tipo</option>
+                                    <option value="ROUBO">ROUBO</option>
+                                    <option value="FURTO">FURTO</option>
+                                    <option value="VANDALISMO">VANDALISMO</option>
+                                    <option value="INVASÃO">INVASÃO DE PROPRIEDADE</option>
+                                    <option value="SUSPEITO">ATIVIDADE SUSPEITA</option>
+                                    <option value="EMERGENCIA_MEDICA">EMERGÊNCIA MÉDICA</option>
+                                    <option value="INCENDIO">INCÊNDIO</option>
+                                    <option value="ACIDENTE">ACIDENTE</option>
+                                    <option value="OUTROS">OUTROS</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="incident-date">Data da Ocorrência *</label>
+                                <input type="date" id="incident-date" name="incidentDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="incident-time">Horário da Ocorrência *</label>
+                                <input type="time" id="incident-time" name="incidentTime" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="incident-priority">Prioridade *</label>
+                            <select id="incident-priority" name="incidentPriority" required>
+                                <option value="">Selecione a prioridade</option>
+                                <option value="BAIXA">🟢 BAIXA</option>
+                                <option value="MEDIA">🟡 MÉDIA</option>
+                                <option value="ALTA">🟠 ALTA</option>
+                                <option value="CRITICA">🔴 CRÍTICA</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="incident-description">Descrição Detalhada da Ocorrência *</label>
+                            <textarea id="incident-description" name="incidentDescription"
+                                placeholder="Descreva detalhadamente o que aconteceu, incluindo horário exato, pessoas envolvidas, ações tomadas, etc."
+                                required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="actions-taken">Ações Tomadas</label>
+                            <textarea id="actions-taken" name="actionsTaken"
+                                placeholder="Descreva as ações imediatas tomadas, contatos realizados, órgãos acionados, etc."></textarea>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="button" class="btn-cancel" onclick="closeIncidentModal()">CANCELAR</button>
+                            <button type="submit" class="btn-save">💾 SALVAR REGISTRO</button>
+                        </div>
+
+                        <div class="export-section" id="export-section">
+                            <h4>📄 EXPORTAR REGISTRO</h4>
+                            <div class="form-buttons">
+                                <button type="button" class="btn-export" onclick="exportSingleIncident()">📄 EXPORTAR
+                                    PDF</button>
+                                <button type="button" class="btn-email" onclick="emailSingleIncident()">📧 ENVIAR POR
+                                    EMAIL</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <button class="accordion">SP - SÃO PAULO (12 SITES)</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HEC01">EUCLIDES DA CUNHA 01 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HPH03">PINHEIROS 03 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HPH07">PINHEIROS 07 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPH81">PINHEIROS 81 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPV01">PRESIDENTE VENCESLAU 01 <span class="risk-indicator risk-moderado"></span>
+                    </li>
+                    <li data-site="HSM03">SERRA DO MAR 03 <span class="risk-indicator risk-alto></span></li>
+                    <li data-site="HSM04">SERRA DO MAR 04 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HSM06">SERRA DO MAR 06 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HSM07">SERRA DO MAR 07 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HSM12">SERRA DO MAR 12 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HSM13">SERRA DO MAR 13 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HTQ01">TAQUARITUBA 01 <span class="risk-indicator risk-alto"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">PR - PARANÁ (7 SITES)</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HAP01">ALTO PARANÁ 01 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HCG01">CIDADE GAUCHA 01 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HIG01">IGUARAÇU <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HLO01">LOANDA 01 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HLO02">LOANDA 02 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HMM01">MUNHOZ DE MELO <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HNE01">NOVA ESPERANÇA <span class="risk-indicator risk-moderado"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">MS - MATO GROSSO DO SUL (5 SITES)</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HBB01">BARRO BRANCO <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HBC01">BACURI <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HCS01">CASSILÂNDIA 01 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPA01">PARAÍSO DAS ÁGUAS <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HPN01">PARANAIBA 01 <span class="risk-indicator risk-moderado"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">CE - CEARÁ (4 SITES) ⚠️</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HCT01">CAATINGA 01 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HCT02">CAATINGA 02 <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HCT15">CAATINGA 15 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HCT23">CAATINGA 23 <span class="risk-indicator risk-alto"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">GO - GOIÁS (5 SITES)</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HBV01">BELA VISTA 01 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPQ11">PEQUI 11 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HPQ21">PEQUI 21 <span class="risk-indicator risk-baixo"></span></li>
+                    <li data-site="HPQ61">PEQUI 61 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPQ71">PEQUI 71 <span class="risk-indicator risk-baixo"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">RN - RIO GRANDE DO NORTE (2 SITES)</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HPP01">PIPA 01 <span class="risk-indicator risk-moderado"></span></li>
+                    <li data-site="HPP12">PIPA 12 <span class="risk-indicator risk-moderado"></span></li>
+                </ul>
+            </div>
+
+            <button class="accordion">OUTROS ESTADOS (3 SITES) 🚨</button>
+            <div class="panel">
+                <ul>
+                    <li data-site="HAC09">AÇAÍ 09 (AM) <span class="risk-indicator risk-alto"></span></li>
+                    <li data-site="HRM01">ROLIM DE MOURA 01 (RO) <span class="risk-indicator risk-critico"></span></li>
+                    <li data-site="HSJ01">SÃO JERONIMO 01 (RS) <span class="risk-indicator risk-baixo"></span></li>
+                </ul>
+            </div>
+
+            <!-- NOVO BOTÃO DE REGISTRO DE OCORRÊNCIAS -->
+            <button id="incident-button" class="incident-btn" onclick="openIncidentModal()">
+                📝 REGISTRAR OCORRÊNCIA
+            </button>
+
+            <button id="consult-button" class="consult-btn" onclick="openConsultModal()">
+                📋 CONSULTAR REGISTROS
+            </button>
+
+            <!-- MODAL DE CONSULTA DE REGISTROS -->
+            <div id="consult-modal" class="modal">
+                <div class="consult-container">
+                    <div class="consult-header">
+                        📋 CONSULTA DE REGISTROS DE OCORRÊNCIAS
+                        <button class="close-modal" onclick="closeConsultModal()">&times;</button>
+                    </div>
+
+                    <div class="consult-actions">
+                        <button class="btn-export-all" onclick="exportAllToPDF()">
+                            📄 EXPORTAR TODOS (PDF)
+                        </button>
+                        <button class="btn-clear-all" onclick="clearAllIncidents()">
+                            🗑️ LIMPAR TODOS OS REGISTROS
+                        </button>
+                    </div>
+
+                    <!-- FILTROS DE CONSULTA -->
+                    <div class="filters-container">
+                        <div class="filters-title">🔍 FILTROS DE CONSULTA</div>
+
+                        <div class="filters-grid">
+                            <div class="filter-group">
+                                <label for="filter-date-from">Data Inicial</label>
+                                <input type="date" id="filter-date-from">
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="filter-date-to">Data Final</label>
+                                <input type="date" id="filter-date-to">
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="filter-operator">Operador</label>
+                                <select id="filter-operator">
+                                    <option value="">Todos os operadores</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="filter-site">Site</label>
+                                <select id="filter-site">
+                                    <option value="">Todos os sites</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="filter-type">Tipo de Ocorrência</label>
+                                <select id="filter-type">
+                                    <option value="">Todos os tipos</option>
+                                    <option value="ROUBO">ROUBO</option>
+                                    <option value="FURTO">FURTO</option>
+                                    <option value="VANDALISMO">VANDALISMO</option>
+                                    <option value="INVASÃO">INVASÃO DE PROPRIEDADE</option>
+                                    <option value="SUSPEITO">ATIVIDADE SUSPEITA</option>
+                                    <option value="EMERGENCIA_MEDICA">EMERGÊNCIA MÉDICA</option>
+                                    <option value="INCENDIO">INCÊNDIO</option>
+                                    <option value="ACIDENTE">ACIDENTE</option>
+                                    <option value="OUTROS">OUTROS</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="filter-priority">Prioridade</label>
+                                <select id="filter-priority">
+                                    <option value="">Todas as prioridades</option>
+                                    <option value="BAIXA">🟢 BAIXA</option>
+                                    <option value="MEDIA">🟡 MÉDIA</option>
+                                    <option value="ALTA">🟠 ALTA</option>
+                                    <option value="CRITICA">🔴 CRÍTICA</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="filter-actions">
+                            <button class="btn-filter" onclick="applyFilters()">🔍 APLICAR FILTROS</button>
+                            <button class="btn-clear-filters" onclick="clearFilters()">🗑️ LIMPAR FILTROS</button>
+                        </div>
+                    </div>
+
+                    <div id="results-info" class="results-info" style="display: none;"></div>
+
+                    <div id="incidents-list">
+                        <!-- Lista será preenchida via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        // Variáveis globais
+        let map;
+        let markers;
+        let markerRefs = {};
+        let currentIncident = null; // Para guardar o incidente recém-salvo no formulário
+        let filteredIncidents = []; // Global para armazenar incidentes filtrados para exportação
+
+        // Dados completos dos 36 sites baseados na planilha real
+        const allSites = [
+            // SÃO PAULO (12 sites)
+            { code: "HEC01", name: "Euclides da Cunha 01", city: "Euclides da Cunha Paulista", uf: "SP", lat: -22.518875, lon: -52.651715, population: 9300, crimes: { robberies: 8, thefts: 15, violence: 3, drugs: 2 }, risk: "low", percentage: 28, pm: { batalhao: "18º BPM/I", telefone: "(18) 3279-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(18) 3229-1193" }, delegacia: { telefone: "(18) 3279-1234" }, privada: { empresa: "Vigiprudente Segurança", contato: "5518998457890", distancia: "12km", tempo: "18min" } },
+            { code: "HPH03", name: "Pinheiros 03", city: "Presidente Alves", uf: "SP", lat: -22.129531, lon: -49.47589, population: 4200, crimes: { robberies: 5, thefts: 12, violence: 2, drugs: 1 }, risk: "low", percentage: 22, pm: { batalhao: "2º BPM/I", telefone: "(14) 3235-9100", tempo_resposta: 30 }, bombeiros: { telefone: "(14) 3223-4193" }, delegacia: { telefone: "(14) 3269-1180" }, privada: { empresa: "Bauru Vigilância", contato: "5514998765432", distancia: "25km", tempo: "35min" } },
+            { code: "HPH07", name: "Pinheiros 07", city: "Guararapes", uf: "SP", lat: -21.233206, lon: -50.666397, population: 31800, crimes: { robberies: 25, thefts: 45, violence: 8, drugs: 5 }, risk: "moderate", percentage: 35, pm: { batalhao: "2º BPM/I", telefone: "(18) 3636-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(18) 3636-1193" }, delegacia: { telefone: "(18) 3704-1234" }, privada: { empresa: "Oeste Segurança", contato: "5518992345678", distancia: "8km", tempo: "12min" } },
+            { code: "HPH81", name: "Pinheiros 81", city: "Barretos", uf: "SP", lat: -20.541574, lon: -48.535947, population: 122800, crimes: { robberies: 89, thefts: 156, violence: 34, drugs: 23 }, risk: "moderate", percentage: 52, pm: { batalhao: "2º BPM/I", telefone: "(17) 3321-9100", tempo_resposta: 15 }, bombeiros: { telefone: "(17) 3322-1193" }, delegacia: { telefone: "(17) 3321-3940" }, privada: { empresa: "Barretos Segurança Elite", contato: "5517995678901", distancia: "5km", tempo: "8min" } },
+            { code: "HPV01", name: "Presidente Venceslau 01", city: "Presidente Venceslau", uf: "SP", lat: -21.912207, lon: -51.850668, population: 39300, crimes: { robberies: 28, thefts: 52, violence: 12, drugs: 8 }, risk: "moderate", percentage: 38, pm: { batalhao: "18º BPM/I", telefone: "(18) 3271-9100", tempo_resposta: 22 }, bombeiros: { telefone: "(18) 3271-1193" }, delegacia: { telefone: "(18) 3271-3456" }, privada: { empresa: "Fronteira Segurança", contato: "5518993456789", distancia: "10km", tempo: "15min" } },
+            { code: "HSM03", name: "Serra do Mar 03", city: "Lorena", uf: "SP", lat: -22.711662, lon: -45.156632, population: 87200, crimes: { robberies: 65, thefts: 98, violence: 22, drugs: 15 }, risk: "moderate", percentage: 42, pm: { batalhao: "2º BPM/I", telefone: "(12) 3625-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(12) 3625-1193" }, delegacia: { telefone: "(12) 3159-8900" }, privada: { empresa: "Vale Segurança", contato: "5512996789012", distancia: "6km", tempo: "10min" } },
+            { code: "HSM04", name: "Serra do Mar 04", city: "Cruzeiro", uf: "SP", lat: -22.59713, lon: -44.991062, population: 87200, crimes: { robberies: 65, thefts: 98, violence: 22, drugs: 15 }, risk: "moderate", percentage: 42, pm: { batalhao: "2º BPM/I", telefone: "(12) 3625-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(12) 3625-1193" }, delegacia: { telefone: "(12) 3159-8900" }, privada: { empresa: "Vale Segurança", contato: "5512996789012", distancia: "6km", tempo: "10min" } },
+            { code: "HSM06", name: "Serra do Mar 06", city: "Caçapava", uf: "SP", lat: -23.021502, lon: -45.719168, population: 94800, crimes: { robberies: 72, thefts: 124, violence: 28, drugs: 18 }, risk: "moderate", percentage: 45, pm: { batalhao: "2º BPM/I", telefone: "(12) 3901-9100", tempo_resposta: 16 }, bombeiros: { telefone: "(12) 3901-1193" }, delegacia: { telefone: "(12) 3901-3456" }, privada: { empresa: "Caçapava Proteção", contato: "5512997890123", distancia: "4km", tempo: "8min" } },
+            { code: "HSM07", name: "Serra do Mar 07", city: "Lorena", uf: "SP", lat: -22.747953, lon: -45.082838, population: 87200, crimes: { robberies: 65, thefts: 98, violence: 22, drugs: 15 }, risk: "moderate", percentage: 42, pm: { batalhao: "2º BPM/I", telefone: "(12) 3625-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(12) 3625-1193" }, delegacia: { telefone: "(12) 3159-8900" }, privada: { empresa: "Vale Segurança", contato: "5512996789012", distancia: "6km", tempo: "10min" } },
+            { code: "HSM12", name: "Serra do Mar 12", city: "Lorena", uf: "SP", lat: -22.737508, lon: -45.057994, population: 87200, crimes: { robberies: 65, thefts: 98, violence: 22, drugs: 15 }, risk: "moderate", percentage: 42, pm: { batalhao: "2º BPM/I", telefone: "(12) 3625-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(12) 3625-1193" }, delegacia: { telefone: "(12) 3159-8900" }, privada: { empresa: "Vale Segurança", contato: "5512996789012", distancia: "6km", tempo: "10min" } },
+            { code: "HSM13", name: "Serra do Mar 13", city: "Caçapava", uf: "SP", lat: -23.0387, lon: -45.723366, population: 94800, crimes: { robberies: 72, thefts: 124, violence: 28, drugs: 18 }, risk: "moderate", percentage: 45, pm: { batalhao: "2º BPM/I", telefone: "(12) 3901-9100", tempo_resposta: 16 }, bombeiros: { telefone: "(12) 3901-1193" }, delegacia: { telefone: "(12) 3901-3456" }, privada: { empresa: "Caçapava Proteção", contato: "5512997890123", distancia: "4km", tempo: "8min" } },
+            { code: "HTQ01", name: "Taquarituba 01", city: "Taquarituba", uf: "SP", lat: -23.502261, lon: -49.277648, population: 23400, crimes: { robberies: 18, thefts: 32, violence: 7, drugs: 4 }, risk: "moderate", percentage: 32, pm: { batalhao: "2º BPM/I", telefone: "(15) 3272-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(15) 3272-1193" }, delegacia: { telefone: "(15) 3272-3456" }, privada: { empresa: "Sul Paulista Segurança", contato: "5515998901234", distancia: "15km", tempo: "20min" } },
+
+            // PARANÁ (7 sites)
+            { code: "HAP01", name: "Alto Paraná 01", city: "Alto Paraná", uf: "PR", lat: -23.150601, lon: -52.342593, population: 14600, crimes: { robberies: 12, thefts: 28, violence: 5, drugs: 3 }, risk: "low", percentage: 26, pm: { batalhao: "COPOM PR", telefone: "(44) 3320-2830", tempo_resposta: 28 }, bombeiros: { telefone: "(44) 3621-1193" }, delegacia: { telefone: "(44) 3621-3456" }, privada: { empresa: "Noroeste Vigilância", contato: "5544999012345", distancia: "18km", tempo: "25min" } },
+            { code: "HCG01", name: "Cidade Gaucha 01", city: "Cidade Gaúcha", uf: "PR", lat: -23.41369, lon: -52.950997, population: 12100, crimes: { robberies: 8, thefts: 22, violence: 4, drugs: 2 }, risk: "low", percentage: 24, pm: { batalhao: "Destacamento Cidade Gaúchaº BPM", telefone: "(44) 9993-0057", tempo_resposta: 32 }, bombeiros: { telefone: "(44) 3621-1193" }, delegacia: { telefone: "(44) 3621-3456" }, privada: { empresa: "Gaúcha Segurança", contato: "5544990123456", distancia: "20km", tempo: "28min" } },
+            { code: "HIG01", name: "Iguaraçu", city: "Iguaraçu", uf: "PR", lat: -23.208201, lon: -51.778229, population: 4800, crimes: { robberies: 3, thefts: 8, violence: 1, drugs: 1 }, risk: "low", percentage: 18, pm: { batalhao: "5º BPM", telefone: "(44) 3016-9100", tempo_resposta: 35 }, bombeiros: { telefone: "(44) 3016-1193" }, delegacia: { telefone: "(44) 3016-3456" }, privada: { empresa: "Maringá Proteção", contato: "5544991234567", distancia: "25km", tempo: "32min" } },
+            { code: "HLO01", name: "Loanda 01", city: "Loanda", uf: "PR", lat: -22.937484, lon: -53.109985, population: 23800, crimes: { robberies: 15, thefts: 35, violence: 8, drugs: 5 }, risk: "low", percentage: 29, pm: { batalhao: "11º BPM", telefone: "(44) 3621-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(44) 3621-1193" }, delegacia: { telefone: "(44) 3621-3456" }, privada: { empresa: "Loanda Vigilância", contato: "5544992345678", distancia: "12km", tempo: "18min" } },
+            { code: "HLO02", name: "Loanda 02", city: "Loanda", uf: "PR", lat: -22.937484, lon: -53.109985, population: 23800, crimes: { robberies: 15, thefts: 35, violence: 8, drugs: 5 }, risk: "low", percentage: 29, pm: { batalhao: "11º BPM", telefone: "(44) 3621-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(44) 3621-1193" }, delegacia: { telefone: "(44) 3621-3456" }, privada: { empresa: "Loanda Vigilância", contato: "5544992345678", distancia: "12km", tempo: "18min" } },
+            { code: "HMM01", name: "Munhoz de Melo", city: "Munhoz de Melo", uf: "PR", lat: -23.211234, lon: -51.756532, population: 3900, crimes: { robberies: 2, thefts: 6, violence: 1, drugs: 0 }, risk: "low", percentage: 15, pm: { batalhao: "5º BPM", telefone: "(44) 3016-9100", tempo_resposta: 40 }, bombeiros: { telefone: "(44) 3016-1193" }, delegacia: { telefone: "(44) 3016-3456" }, privada: { empresa: "Região Norte Segurança", contato: "5544993456789", distancia: "28km", tempo: "35min" } },
+            { code: "HNE01", name: "Nova Esperança", city: "Nova Esperança", uf: "PR", lat: -23.181283, lon: -52.203799, population: 28000, crimes: { robberies: 20, thefts: 40, violence: 10, drugs: 6 }, risk: "moderate", percentage: 35, pm: { batalhao: "8º BPM", telefone: "(44) 3251-9100", tempo_resposta: 22 }, bombeiros: { telefone: "(44) 3251-1193" }, delegacia: { telefone: "(44) 3251-3456" }, privada: { empresa: "Nova Proteção", contato: "5544994567890", distancia: "10km", tempo: "15min" } },
+
+            // MATO GROSSO DO SUL (5 sites)
+            { code: "HBB01", name: "Barro Branco", city: "Corumbá", uf: "MS", lat: -19.0069, lon: -57.6534, population: 112000, crimes: { robberies: 50, thefts: 80, violence: 15, drugs: 10 }, risk: "moderate", percentage: 40, pm: { batalhao: "6º BPM", telefone: "(67) 3234-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(67) 3234-1193" }, delegacia: { telefone: "(67) 3234-3456" }, privada: { empresa: "Fronteira Oeste Segurança", contato: "5567995678901", distancia: "8km", tempo: "12min" } },
+            { code: "HBC01", name: "Bacuri", city: "Campo Grande", uf: "MS", lat: -20.4682, lon: -54.6062, population: 906000, crimes: { robberies: 150, thefts: 250, violence: 40, drugs: 30 }, risk: "moderate", percentage: 48, pm: { batalhao: "1º BPM", telefone: "(67) 3302-9100", tempo_resposta: 15 }, bombeiros: { telefone: "(67) 3302-1193" }, delegacia: { telefone: "(67) 3302-3456" }, privada: { empresa: "Capital Segurança", contato: "5567996789012", distancia: "5km", tempo: "8min" } },
+            { code: "HCS01", name: "Cassilândia 01", city: "Cassilândia", uf: "MS", lat: -19.113, lon: -51.737, population: 22000, crimes: { robberies: 15, thefts: 30, violence: 5, drugs: 4 }, risk: "moderate", percentage: 30, pm: { batalhao: "13º BPM", telefone: "(67) 3596-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(67) 3596-1193" }, delegacia: { telefone: "(67) 3596-3456" }, privada: { empresa: "Leste MS Vigilância", contato: "5567997890123", distancia: "10km", tempo: "15min" } },
+            { code: "HPA01", name: "Paraíso das Águas", city: "Paraíso das Águas", uf: "MS", lat: -19.4632, lon: -53.0366, population: 5700, crimes: { robberies: 5, thefts: 10, violence: 2, drugs: 1 }, risk: "low", percentage: 20, pm: { batalhao: "4º BPM", telefone: "(67) 3248-9100", tempo_resposta: 35 }, bombeiros: { telefone: "(67) 3248-1193" }, delegacia: { telefone: "(67) 3248-3456" }, privada: { empresa: "Norte MS Segurança", contato: "5567998901234", distancia: "20km", tempo: "30min" } },
+            { code: "HPN01", name: "Paranaiba 01", city: "Paranaíba", uf: "MS", lat: -19.684, lon: -51.192, population: 42000, crimes: { robberies: 25, thefts: 45, violence: 8, drugs: 6 }, risk: "moderate", percentage: 38, pm: { batalhao: "13º BPM", telefone: "(67) 3669-9100", tempo_resposta: 22 }, bombeiros: { telefone: "(67) 3669-1193" }, delegacia: { telefone: "(67) 3669-3456" }, privada: { empresa: "Oeste MS Proteção", contato: "5567990123456", distancia: "12km", tempo: "18min" } },
+
+            // CEARÁ (4 sites)
+            { code: "HCT01", name: "Caatinga 01", city: "Boa Viagem", uf: "CE", lat: -5.1977, lon: -39.7285, population: 55000, crimes: { robberies: 80, thefts: 120, violence: 20, drugs: 15 }, risk: "high", percentage: 65, pm: { batalhao: "9º BPM", telefone: "(88) 3427-9100", tempo_resposta: 30 }, bombeiros: { telefone: "(88) 3427-1193" }, delegacia: { telefone: "(88) 3427-3456" }, privada: { empresa: "Sertão Central Vigilância", contato: "5588991234567", distancia: "15km", tempo: "20min" } },
+            { code: "HCT02", name: "Caatinga 02", city: "Mombon", uf: "CE", lat: -5.875, lon: -39.77, population: 15000, crimes: { robberies: 60, thefts: 90, violence: 18, drugs: 12 }, risk: "high", percentage: 60, pm: { batalhao: "9º BPM", telefone: "(88) 3436-9100", tempo_resposta: 35 }, bombeiros: { telefone: "(88) 3436-1193" }, delegacia: { telefone: "(88) 3436-3456" }, privada: { empresa: "Mombon Proteção", contato: "5588992345678", distancia: "18km", tempo: "25min" } },
+            { code: "HCT15", name: "Caatinga 15", city: "Quixadá", uf: "CE", lat: -4.9705, lon: -39.0145, population: 88000, crimes: { robberies: 40, thefts: 70, violence: 12, drugs: 8 }, risk: "moderate", percentage: 45, pm: { batalhao: "9º BPM", telefone: "(88) 3412-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(88) 3412-1193" }, delegacia: { telefone: "(88) 3412-3456" }, privada: { empresa: "Quixadá Segurança", contato: "5588993456789", distancia: "5km", tempo: "10min" } },
+            { code: "HCT23", name: "Caatinga 23", city: "Tauá", uf: "CE", lat: -5.864, lon: -40.298, population: 60000, crimes: { robberies: 75, thefts: 110, violence: 22, drugs: 16 }, risk: "high", percentage: 68, pm: { batalhao: "13º BPM", telefone: "(88) 3437-9100", tempo_resposta: 28 }, bombeiros: { telefone: "(88) 3437-1193" }, delegacia: { telefone: "(88) 3437-3456" }, privada: { empresa: "Inhamuns Vigilância", contato: "5588994567890", distancia: "10km", tempo: "15min" } },
+
+            // GOIÁS (5 sites)
+            { code: "HBV01", name: "Bela Vista 01", city: "Bela Vista de Goiás", uf: "GO", lat: -16.974, lon: -48.955, population: 29000, crimes: { robberies: 20, thefts: 35, violence: 7, drugs: 4 }, risk: "moderate", percentage: 33, pm: { batalhao: "27º BPM", telefone: "(62) 3557-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(62) 3557-1193" }, delegacia: { telefone: "(62) 3557-3456" }, privada: { empresa: "Serras Douradas Segurança", contato: "5562991234567", distancia: "10km", tempo: "15min" } },
+            { code: "HPQ11", name: "Pequi 11", city: "Posse", uf: "GO", lat: -14.090, lon: -46.368, population: 37000, crimes: { robberies: 10, thefts: 20, violence: 3, drugs: 2 }, risk: "low", percentage: 25, pm: { batalhao: "24º BPM", telefone: "(62) 3481-9100", tempo_resposta: 30 }, bombeiros: { telefone: "(62) 3481-1193" }, delegacia: { telefone: "(62) 3481-3456" }, privada: { empresa: "Alto Paranaíba Vigilância", contato: "5562992345678", distancia: "15km", tempo: "22min" } },
+            { code: "HPQ21", name: "Pequi 21", city: "Formosa", uf: "GO", lat: -15.485, lon: -47.337, population: 120000, crimes: { robberies: 25, thefts: 40, violence: 8, drugs: 5 }, risk: "low", percentage: 30, pm: { batalhao: "16º BPM", telefone: "(61) 3631-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(61) 3631-1193" }, delegacia: { telefone: "(61) 3631-3456" }, privada: { empresa: "Leste Goiano Proteção", contato: "5561993456789", distancia: "8km", tempo: "12min" } },
+            { code: "HPQ61", name: "Pequi 61", city: "Cristalina", uf: "GO", lat: -16.764, lon: -47.614, population: 60000, crimes: { robberies: 30, thefts: 50, violence: 10, drugs: 6 }, risk: "moderate", percentage: 40, pm: { batalhao: "20º BPM", telefone: "(61) 3612-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(61) 3612-1193" }, delegacia: { telefone: "(61) 3612-3456" }, privada: { empresa: "Planalto Segurança", contato: "5561994567890", distancia: "5km", tempo: "10min" } },
+            { code: "HPQ71", name: "Pequi 71", city: "Ipameri", uf: "GO", lat: -17.720, lon: -48.156, population: 28000, crimes: { robberies: 15, thefts: 25, violence: 4, drugs: 3 }, risk: "low", percentage: 28, pm: { batalhao: "27º BPM", telefone: "(64) 3491-9100", tempo_resposta: 22 }, bombeiros: { telefone: "(64) 3491-1193" }, delegacia: { telefone: "(64) 3491-3456" }, privada: { empresa: "Sudeste Goiano Vigilância", contato: "5564995678901", distancia: "12km", tempo: "18min" } },
+
+            // RIO GRANDE DO NORTE (2 sites)
+            { code: "HPP01", name: "Pipa 01", city: "Tibau do Sul", uf: "RN", lat: -6.225, lon: -35.076, population: 15000, crimes: { robberies: 30, thefts: 50, violence: 10, drugs: 8 }, risk: "moderate", percentage: 45, pm: { batalhao: "3º BPM", telefone: "(84) 3215-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(84) 3215-1193" }, delegacia: { telefone: "(84) 3215-3456" }, privada: { empresa: "Costa Dourada Segurança", contato: "5584991234567", distancia: "8km", tempo: "12min" } },
+            { code: "HPP12", name: "Pipa 12", city: "Goianinha", uf: "RN", lat: -6.262, lon: -35.195, population: 26000, crimes: { robberies: 25, thefts: 40, violence: 8, drugs: 6 }, risk: "moderate", percentage: 40, pm: { batalhao: "3º BPM", telefone: "(84) 3241-9100", tempo_resposta: 25 }, bombeiros: { telefone: "(84) 3241-1193" }, delegacia: { telefone: "(84) 3241-3456" }, privada: { empresa: "Agreste Potiguar Proteção", contato: "5584992345678", distancia: "10km", tempo: "15min" } },
+
+            // OUTROS ESTADOS (3 sites)
+            { code: "HAC09", name: "Açaí 09", city: "Presidente Figueiredo", uf: "AM", lat: -1.970, lon: -60.088, population: 35000, crimes: { robberies: 60, thefts: 90, violence: 18, drugs: 12 }, risk: "high", percentage: 78, pm: { batalhao: "2º BPM", telefone: "(92) 3324-9100", tempo_resposta: 20 }, bombeiros: { telefone: "(92) 3324-1193" }, delegacia: { telefone: "(92) 3324-3456" }, privada: { empresa: "Floresta Segurança", contato: "5592991234567", distancia: "5km", tempo: "10min" } },
+            { code: "HRM01", name: "Rolim de Moura 01", city: "Rolim de Moura", uf: "RO", lat: -11.724, lon: -61.782, population: 56000, crimes: { robberies: 125, thefts: 198, violence: 89, drugs: 56 }, risk: "critical", percentage: 85, pm: { batalhao: "10º BPM", telefone: "(69) 3442-9100", tempo_resposta: 45 }, bombeiros: { telefone: "(69) 3442-1193" }, delegacia: { telefone: "(69) 3442-3456" }, privada: { empresa: "Zona da Mata Vigilância", contato: "5569992345678", distancia: "10km", tempo: "15min" } },
+            { code: "HSJ01", name: "São Jeronimo 01", city: "São Jerônimo", uf: "RS", lat: -30.093, lon: -51.725, population: 25000, crimes: { robberies: 15, thefts: 25, violence: 5, drugs: 3 }, risk: "low", percentage: 20, pm: { batalhao: "34º BPM", telefone: "(51) 3651-9100", tempo_resposta: 18 }, bombeiros: { telefone: "(51) 3651-1193" }, delegacia: { telefone: "(51) 3651-3456" }, privada: { empresa: "Carbonífera Segurança", contato: "5551993456789", distancia: "7km", tempo: "10min" } },
+        ];
+
+
+        // Mapeamento de risco para cores
+        const riskColors = {
+            "low": "#28a745", // Verde
+            "moderate": "#ffc107", // Amarelo
+            "high": "#fd7e14", // Laranja
+            "critical": "#dc3545" // Vermelho
+        };
+
+        // Funções para Modais
+        function openEmergencyModal() {
+            document.getElementById('emergency-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeEmergencyModal() {
+            document.getElementById('emergency-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        function openIncidentModal() {
+            document.getElementById('incident-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            setCurrentDateTime(); // Preenche a data e hora atuais
+            document.getElementById('export-section').classList.remove('active'); // Garante que a seção de exportação esteja oculta
+        }
+
+        function closeIncidentModal() {
+            document.getElementById('incident-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.getElementById('incident-form').reset(); // Limpa o formulário
+            currentIncident = null; // Reseta o incidente atual
+        }
+
+        function openConsultModal() {
+            document.getElementById('consult-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            populateFilterOperators();
+            populateFilterSites();
+            loadIncidentsList();
+        }
+
+        function closeConsultModal() {
+            document.getElementById('consult-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            clearFilters(); // Limpa os filtros ao fechar o modal
+        }
+
+        // Funções para Interação com Mapa
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([-15.7801, -47.9292], 4); // Centro do Brasil
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Adiciona controle de zoom personalizado no canto superior esquerdo
+            L.control.zoom({ position: 'topleft' }).addTo(map);
+
+            markers = L.markerClusterGroup({
+                maxClusterRadius: 80 // Ajusta o raio para agrupar mais marcadores
+            });
+            map.addLayer(markers);
+
+            addSiteMarkers();
+        }
+
+        // Helper function to create a WhatsApp link
+        function createWhatsAppLink(rawNumber, displayText) {
+            if (!rawNumber) return displayText || '';
+
+            // Remove all non-digit characters
+            let cleanedNumber = rawNumber.replace(/\D/g, '');
+
+            // If the number is too short (e.g., 190, 192, 193, 197), it's likely an emergency service
+            // that doesn't work with wa.me. In this case, return just the display text or a tel: link.
+            if (cleanedNumber.length < 8) {
+                // If it's a known emergency number, create a tel: link
+                if (['190', '192', '193', '197'].includes(cleanedNumber)) {
+                    return `<a href="tel:${cleanedNumber}" style="color: #007bff; text-decoration: none; font-weight: bold;">${displayText || rawNumber}</a>`;
+                }
+                return displayText || rawNumber; // Otherwise, just display the text
+            }
+
+            // Prepend '55' (Brazil country code) if it's not already present
+            // This heuristic assumes typical Brazilian DDD + number format (10 or 11 digits)
+            if (!cleanedNumber.startsWith('55')) {
+                // Check if it's a valid Brazilian phone number length (10 or 11 digits for DDD + number)
+                if (cleanedNumber.length === 10 || cleanedNumber.length === 11) {
+                    cleanedNumber = `55${cleanedNumber}`;
+                }
+            }
+
+            const whatsappUrl = `https://wa.me/${cleanedNumber}`;
+            return `<a href="${whatsappUrl}" target="_blank" style="color: #25D366; text-decoration: none; font-weight: bold;">${displayText || rawNumber}</a>`;
+        }
+
+        function addSiteMarkers() {
+            markers.clearLayers();
+
+            allSites.forEach(site => {
+                const iconColor = riskColors[site.risk];
+
+                const marker = L.marker([site.lat, site.lon], {
+                    icon: L.divIcon({
+                        className: 'marker',
+                        html: `<div style="background: ${iconColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`
+                    })
+                });
+
+                // Tooltip para hover com nome do site
+                marker.bindTooltip(site.name, {
+                    permanent: false,
+                    direction: 'top',
+                    className: 'pin-tooltip'
+                });
+
+                // Popup com layout completo incluindo termômetro de segurança
+                const popupContent = `
+                    <div class="popup-header">
+                        ${site.name} (${site.code})
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Localização:</strong> ${site.city}, ${site.uf}<br>
+                        <strong>População:</strong> ${site.population.toLocaleString()} habitantes
+                    </div>
+
+                    ${generateSecurityThermometer(site)}
+
+                    <div class="protocol-section">
+                        <div class="protocol-title">🚔 PROTOCOLO POLÍCIA MILITAR</div>
+                        <strong>Batalhão:</strong> ${site.pm.batalhao}<br>
+                        <strong>Contato Direto:</strong> ${createWhatsAppLink(site.pm.telefone, site.pm.telefone)}<br>
+                        <strong>Tempo Estimado:</strong> ${site.pm.tempo_resposta} min
+                    </div>
+
+                    <div class="protocol-section">
+                        <div class="protocol-title">🛡️ SEGURANÇA PRIVADA</div>
+                        <strong>${site.privada.empresa}</strong><br>
+                        Distância: ${site.privada.distancia} | Tempo: ${site.privada.tempo}<br>
+                        Contato: ${createWhatsAppLink(site.privada.contato, site.privada.contato)}
+                    </div>
+
+                    <div class="protocol-section">
+                        <div class="protocol-title">🏛️ ÓRGÃOS PÚBLICOS</div>
+                        <strong>Bombeiros:</strong> ${createWhatsAppLink(site.bombeiros.telefone, site.bombeiros.telefone)}<br>
+                        <strong>Delegacia:</strong> ${createWhatsAppLink(site.delegacia.telefone, site.delegacia.telefone)}<br>
+                        <strong>PM Geral:</strong> ${createWhatsAppLink('190', '190')} | <strong>SAMU:</strong> ${createWhatsAppLink('192', '192')}
+                    </div>
+
+                    <button class="protocol-button" onclick="alert('PROTOCOLO DE EMERGÊNCIA:\n\n1. AVALIE A URGÊNCIA DA SITUAÇÃO\n2. CONSIDERE O NÍVEL DE CRIMINALIDADE LOCAL (${site.percentage}%)\n3. CONTATE PM VIA NÚMERO DIRETO\n4. SE NECESSÁRIO, ACIONE SEGURANÇA PRIVADA\n5. REGISTRE O INCIDENTE NO SISTEMA\n6. NOTIFIQUE SUPERVISÃO')">
+                        🚨 SEGUIR PROTOCOLO DE EMERGÊNCIA
+                    </button>
+                `;
+
+                marker.bindPopup(popupContent, {
+                    maxWidth: 450,
+                    className: 'custom-popup'
+                });
+
+                markers.addLayer(marker);
+                markerRefs[site.code] = marker;
+            });
+        }
+
+
+        function generateSecurityThermometer(site) {
+            const riskLevel = site.risk;
+            const percentage = site.percentage;
+            let barColor;
+            let riskClass;
+
+            if (percentage <= 30) {
+                barColor = '#28a745';
+                riskClass = 'risk-low';
+            } else if (percentage <= 55) {
+                barColor = '#ffc107';
+                riskClass = 'risk-moderate';
+            } else if (percentage <= 75) {
+                barColor = '#fd7e14';
+                riskClass = 'risk-high';
+            } else {
+                barColor = '#dc3545';
+                riskClass = 'risk-critical';
+            }
+
+            return `
+                <div class="security-thermometer">
+                    <div class="thermometer-header">
+                        <div class="thermometer-title">Termômetro de Segurança</div>
+                        <span class="risk-level ${riskClass}">${riskLevel.toUpperCase()}</span>
+                    </div>
+                    <div class="thermometer-bar">
+                        <div class="thermometer-fill" style="width: ${percentage}%; background: ${barColor};">
+                            <span class="thermometer-percentage">${percentage}%</span>
+                        </div>
+                    </div>
+                    <div class="crime-stats">
+                        <div class="crime-stat">Roubos/Mês: <span class="crime-stat-value">${site.crimes.robberies}</span></div>
+                        <div class="crime-stat">Furtos/Mês: <span class="crime-stat-value">${site.crimes.thefts}</span></div>
+                        <div class="crime-stat">Violência/Mês: <span class="crime-stat-value">${site.crimes.violence}</span></div>
+                        <div class="crime-stat">Drogas/Mês: <span class="crime-stat-value">${site.crimes.drugs}</span></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Funções para Sidebar
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('active');
+            document.querySelector('.hamburger').classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('active');
+            document.querySelector('.hamburger').classList.remove('active');
+        }
+
+        // Funções de busca e sugestões
+        function filterSites(query) {
+            const filtered = allSites.filter(site =>
+                site.name.toLowerCase().includes(query.toLowerCase()) ||
+                site.code.toLowerCase().includes(query.toLowerCase()) ||
+                site.city.toLowerCase().includes(query.toLowerCase()) ||
+                site.uf.toLowerCase().includes(query.toLowerCase())
+            );
+            return filtered;
+        }
+
+        function showSuggestions(query) {
+            const suggestionsDiv = document.getElementById('suggestions');
+            suggestionsDiv.innerHTML = '';
+
+            if (query.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            const filteredSites = filterSites(query);
+
+            if (filteredSites.length > 0) {
+                filteredSites.forEach(site => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.textContent = `${site.name} (${site.city}, ${site.uf})`;
+                    item.onclick = () => {
+                        selectSite(site);
+                        suggestionsDiv.style.display = 'none';
+                    };
+                    suggestionsDiv.appendChild(item);
+                });
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        }
+
+        function selectSite(site) {
+            document.getElementById('search').value = `${site.name} (${site.city}, ${site.uf})`;
+            map.flyTo([site.lat, site.lon], 10); // Voa para o marcador selecionado e dá zoom
+            markerRefs[site.code].openPopup(); // Abre o popup do marcador selecionado
+            closeSidebar();
+        }
+
+        // Funções do Acordeão (Sidebar)
+        var acc = document.getElementsByClassName("accordion");
+        var i;
+
+        for (i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function () {
+                /* Toggle between adding and removing the "active" class,
+                to highlight the button that controls the panel */
+                this.classList.toggle("active");
+
+                /* Toggle between hiding and showing the active panel */
+                var panel = this.nextElementSibling;
+                if (panel.style.maxHeight) {
+                    panel.style.maxHeight = null;
+                } else {
+                    panel.style.maxHeight = panel.scrollHeight + "px";
+                }
+            });
+        }
+
+        // Funções de ação de emergência (botão WhatsApp)
+        function openWhatsApp(phoneNumber, message = 'Olá! Preciso de ajuda com a segurança.') {
+            // Remove todos os caracteres não numéricos do número
+            const cleanedNumber = phoneNumber.replace(/\D/g, '');
+
+            // Usa '55' (código do Brasil) por padrão se não houver um código de país
+            const fullNumber = cleanedNumber.startsWith('55') ? cleanedNumber : `55${cleanedNumber}`;
+
+            const url = `https://wa.me/${fullNumber}?text=${encodeURIComponent(message)}`;
+            window.open(url, '_blank');
+        }
+
+        // ==========================================================
+        // FUNÇÕES PARA O MODAL DE CONSULTA (LISTA E FILTROS DE OCORRÊNCIAS)
+        // ==========================================================
+
+        function getPriorityColorClass(priority) {
+            switch (priority) {
+                case 'BAIXA': return 'priority-baixa';
+                case 'MEDIA': return 'priority-media';
+                case 'ALTA': return 'priority-alta';
+                case 'CRITICA': return 'priority-critica';
+                default: return '';
+            }
+        }
+
+        function loadIncidentsList(incidents = null) {
+            const container = document.getElementById('incidents-list');
+            const resultsInfo = document.getElementById('results-info');
+            const allIncidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+            const incidentsToShow = incidents === null ? allIncidents : incidents;
+
+            filteredIncidents = incidentsToShow; // Update global filteredIncidents for export all
+
+            if (incidentsToShow.length === 0) {
+                container.innerHTML = '<div class="no-incidents">Nenhum registro encontrado.</div>';
+                resultsInfo.style.display = 'none';
+                return;
+            }
+
+            let tableHtml = `
+                <table class="incidents-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Operador</th>
+                            <th>Site</th>
+                            <th>Tipo</th>
+                            <th>Data/Hora</th>
+                            <th>Prioridade</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            incidentsToShow.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort by newest first
+
+            incidentsToShow.forEach(incident => {
+                const incidentDate = new Date(incident.incidentDate || incident.timestamp);
+                const formattedDate = incidentDate.toLocaleDateString('pt-BR');
+                const formattedTime = incident.incidentTime || incidentDate.toLocaleTimeString('pt-BR').substring(0, 5);
+                const priorityClass = getPriorityColorClass(incident.incidentPriority);
+
+                tableHtml += `
+                    <tr>
+                        <td>${incident.id}</td>
+                        <td>${incident.operatorName}<br><small>(${incident.operatorShift})</small></td>
+                        <td>${incident.incidentSite}</td>
+                        <td>${incident.incidentType}</td>
+                        <td>${formattedDate}<br><small>às ${formattedTime}</small></td>
+                        <td><span class="priority-badge ${priorityClass}">${incident.incidentPriority}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-action btn-view" title="Visualizar Detalhes" onclick="viewIncidentDetails('${incident.id}')">👁️</button>
+                                <button class="btn-action btn-export-single" title="Exportar Registro" onclick="exportSingleIncident('${incident.id}')">📄</button>
+                                <button class="btn-action btn-email-single" title="Enviar por Email" onclick="emailSingleIncident('${incident.id}')">📧</button>
+                                <button class="btn-action btn-delete" title="Excluir Registro" onclick="deleteIncident('${incident.id}')">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = tableHtml;
+            updateResultsInfo(incidentsToShow.length);
+        }
+
+        function updateResultsInfo(count) {
+            const resultsInfo = document.getElementById('results-info');
+            resultsInfo.textContent = `${count} registros encontrados.`;
+            resultsInfo.style.display = 'block';
+        }
+
+        function applyFilters() {
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+            const operator = document.getElementById('filter-operator').value;
+            const site = document.getElementById('filter-site').value;
+            const type = document.getElementById('filter-type').value;
+            const priority = document.getElementById('filter-priority').value;
+
+            const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+
+            const filtered = incidents.filter(incident => {
+                const incidentDate = new Date(incident.incidentDate || incident.timestamp);
+
+                if (dateFrom && incidentDate < new Date(dateFrom)) return false;
+                if (dateTo) {
+                    const dateToAdjusted = new Date(dateTo);
+                    dateToAdjusted.setDate(dateToAdjusted.getDate() + 1); // Include full day
+                    if (incidentDate >= dateToAdjusted) return false;
+                }
+                if (operator && incident.operatorName.toLowerCase().indexOf(operator.toLowerCase()) === -1) return false;
+                if (site && incident.incidentSite !== site) return false;
+                if (type && incident.incidentType !== type) return false;
+                if (priority && incident.incidentPriority !== priority) return false;
+
+                return true;
+            });
+
+            loadIncidentsList(filtered);
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-date-from').value = '';
+            document.getElementById('filter-date-to').value = '';
+            document.getElementById('filter-operator').value = '';
+            document.getElementById('filter-site').value = '';
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-priority').value = '';
+            loadIncidentsList();
+        }
+
+        function populateFilterOperators() {
+            const operatorSelect = document.getElementById('filter-operator');
+            operatorSelect.innerHTML = '<option value="">Todos os operadores</option>';
+            const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+            const operators = new Set(incidents.map(inc => inc.operatorName));
+            operators.forEach(op => {
+                const option = document.createElement('option');
+                option.value = op;
+                option.textContent = op;
+                operatorSelect.appendChild(option);
+            });
+        }
+
+        function populateFilterSites() {
+            const siteSelect = document.getElementById('filter-site');
+            siteSelect.innerHTML = '<option value="">Todos os sites</option>';
+            const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+            const sites = new Set(incidents.map(inc => inc.incidentSite));
+            sites.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s;
+                option.textContent = s;
+                siteSelect.appendChild(option);
+            });
+        }
+
+
+        // ========== FUNÇÕES DE FORMULÁRIO ==========
+
+        function populateSiteOptions() {
+            const siteSelect = document.getElementById('incident-site');
+            siteSelect.innerHTML = '<option value="">Selecione o site</option>';
+            allSites.forEach(site => {
+                const option = document.createElement('option');
+                option.value = site.code;
+                option.textContent = `${site.name} (${site.city}, ${site.uf})`;
+                siteSelect.appendChild(option);
+            });
+        }
+
+        function setCurrentDateTime() {
+            const now = new Date();
+            const date = now.toISOString().split('T')[0];
+            const time = now.toTimeString().split(' ')[0].substring(0, 5);
+
+            document.getElementById('incident-date').value = date;
+            document.getElementById('incident-time').value = time;
+        }
+
+        // ========== FUNÇÕES DE EXPORTAÇÃO ==========
+
+        function generatePDFContent(incident) {
+            return `
+HELEXIA UFV SECURITY MONITORING - REGISTRO DE OCORRÊNCIA
+================================================================
+
+ID DA OCORRÊNCIA: ${incident.id}
+DATA/HORA DO REGISTRO: ${new Date(incident.timestamp).toLocaleString('pt-BR')}
+
+DADOS DO OPERADOR:
+- Nome: ${incident.operatorName}
+- Turno: ${incident.operatorShift}
+
+DADOS DA OCORRÊNCIA:
+- Site: ${incident.siteDetails ? incident.siteDetails.name : incident.incidentSite}
+- Localização: ${incident.siteDetails ? `${incident.siteDetails.city}, ${incident.siteDetails.uf}` : 'N/A'}
+- Tipo: ${incident.incidentType}
+- Data: ${new Date(incident.incidentDate).toLocaleDateString('pt-BR')}
+- Horário: ${incident.incidentTime}
+- Prioridade: ${incident.incidentPriority}
+
+DESCRIÇÃO:
+${incident.incidentDescription}
+
+AÇÕES TOMADAS:
+${incident.actionsTaken || 'Nenhuma ação específica registrada'}
+
+================================================================
+Documento gerado automaticamente pelo sistema MOVISAFE
+Data de geração: ${new Date().toLocaleString('pt-BR')}
+            `;
+        }
+
+        function generateEmailContent(incident) {
+            return `
+🚨 REGISTRO DE OCORRÊNCIA - HELEXIA UFV SECURITY
+
+ID: ${incident.id}
+Operador: ${incident.operatorName} (${incident.operatorShift})
+
+📍 LOCAL: ${incident.siteDetails ? incident.siteDetails.name : incident.incidentSite}
+🏙️ CIDADE: ${incident.siteDetails ? `${incident.siteDetails.city}, ${incident.siteDetails.uf}` : 'N/A'}
+📅 DATA: ${new Date(incident.incidentDate).toLocaleDateString('pt-BR')}
+🕐 HORÁRIO: ${incident.incidentTime}
+⚠️ TIPO: ${incident.incidentType}
+🚨 PRIORIDADE: ${incident.incidentPriority}
+
+📝 DESCRIÇÃO:
+${incident.incidentDescription}
+
+🛠️ AÇÕES TOMADAS:
+${incident.actionsTaken || 'Nenhuma ação específica registrada'}
+
+---
+Sistema MOVISAFE - ${new Date().toLocaleString('pt-BR')}
+            `;
+        }
+
+        // Funções para ações individuais da tabela
+        function viewIncidentDetails(id) {
+            const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+            const incident = incidents.find(inc => inc.id === id);
+            if (incident) {
+                let details = `ID: ${incident.id}\nOperador: ${incident.operatorName} (${incident.operatorShift})\nSite: ${incident.incidentSite}\nTipo: ${incident.incidentType}\nData: ${new Date(incident.incidentDate).toLocaleDateString('pt-BR')} às ${incident.incidentTime}\nPrioridade: ${incident.incidentPriority}\n\nDescrição:\n${incident.incidentDescription}\n\nAções Tomadas:\n${incident.actionsTaken || 'Nenhuma ação específica registrada'}`;
+                alert(`Detalhes da Ocorrência:\n\n${details}`);
+            }
+        }
+
+        function exportSingleIncident(id = null) {
+            let incidentToExport = currentIncident;
+            if (id) { // If called from table, fetch specific incident
+                const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+                incidentToExport = incidents.find(inc => inc.id === id);
+            }
+
+            if (!incidentToExport) {
+                alert('❌ Nenhum registro para exportar!');
+                return;
+            }
+
+            const pdfContent = generatePDFContent(incidentToExport);
+
+            const blob = new Blob([pdfContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `OCORRENCIA_${incidentToExport.id}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert('📄 ARQUIVO EXPORTADO COM SUCESSO!\n\nO arquivo foi baixado como: OCORRENCIA_' + incidentToExport.id + '.txt');
+        }
+
+        function emailSingleIncident(id = null) {
+            let incidentToEmail = currentIncident;
+            if (id) { // If called from table, fetch specific incident
+                const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+                incidentToEmail = incidents.find(inc => inc.id === id);
+            }
+
+            if (!incidentToEmail) {
+                alert('❌ Nenhum registro para enviar!');
+                return;
+            }
+
+            const emailContent = generateEmailContent(incidentToEmail);
+            const subject = `[HELEXIA UFV] REGISTRO DE OCORRÊNCIA - ${incidentToEmail.id}`;
+
+            const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailContent)}`;
+            window.open(mailtoLink);
+        }
+
+        function deleteIncident(id) {
+            if (confirm(`Tem certeza que deseja excluir o registro ${id}?`)) {
+                let incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+                incidents = incidents.filter(inc => inc.id !== id);
+                localStorage.setItem('helexia_incidents', JSON.stringify(incidents));
+                loadIncidentsList(); // Reload list after deletion
+                alert('Registro excluído com sucesso!');
+            }
+        }
+
+        function exportAllToPDF() {
+            if (filteredIncidents.length === 0) {
+                alert('Nenhum registro para exportar. Aplique os filtros ou limpe-os.');
+                return;
+            }
+
+            let allContent = "HELEXIA UFV SECURITY MONITORING - RELATÓRIO DE OCORRÊNCIAS\n";
+            allContent += "================================================================\n\n";
+            allContent += `Registros Exportados: ${filteredIncidents.length}\n`;
+            allContent += `Data de Exportação: ${new Date().toLocaleString('pt-BR')}\n\n`;
+
+            filteredIncidents.forEach((incident, index) => {
+                allContent += `--- OCORRÊNCIA ${index + 1} ---\n`;
+                allContent += generatePDFContent(incident) + "\n\n";
+            });
+
+            const blob = new Blob([allContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RELATORIO_OCORRENCIAS_HELEXIA_${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`📄 RELATÓRIO EXPORTADO COM SUCESSO!\n\n${filteredIncidents.length} registros foram incluídos no arquivo.`);
+        }
+
+        function clearAllIncidents() {
+            if (confirm('ATENÇÃO: Tem certeza que deseja APAGAR TODOS os registros de ocorrências? Esta ação é irreversível.')) {
+                localStorage.removeItem('helexia_incidents');
+                loadIncidentsList();
+                alert('Todos os registros foram apagados.');
+                closeConsultModal(); // Close after clearing all
+            }
+        }
+
+        // Funções do popup de confirmação (após salvar registro)
+        function showConfirmationPopup(incident) {
+            const popup = document.getElementById('confirmation-popup');
+            const idDisplay = document.getElementById('incident-id-display');
+
+            if (popup && idDisplay) {
+                idDisplay.textContent = incident.id;
+                popup.classList.add('show');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeConfirmationPopup() {
+            const popup = document.getElementById('confirmation-popup');
+            if (popup) {
+                popup.classList.remove('show');
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        function goToRecords() {
+            closeConfirmationPopup();
+            openConsultModal();
+        }
+
+        // ========== EVENT LISTENERS ==========
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initMap(); // Inicializa o mapa ao carregar a página
+
+            // Inicializar com alguns dados de exemplo se não houver nenhum
+            if (!localStorage.getItem('helexia_incidents') || JSON.parse(localStorage.getItem('helexia_incidents')).length === 0) {
+                const exampleIncident = {
+                    id: 'INC-' + (Date.now() - 86400000),
+                    timestamp: new Date(Date.now() - 86400000).toISOString(),
+                    operatorName: 'Romario',
+                    operatorShift: 'DIURNO',
+                    incidentSite: 'HEC01', // Corresponds to a site in allSites
+                    incidentType: 'FURTO',
+                    incidentDate: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+                    incidentTime: '10:15',
+                    incidentPriority: 'MEDIA',
+                    incidentDescription: 'Furto de equipamento na área de estacionamento. Câmeras registraram um indivíduo suspeito.',
+                    actionsTaken: 'Acionada equipe de segurança interna e registrado boletim de ocorrência online. Imagens encaminhadas.',
+                    siteDetails: allSites.find(site => site.code === 'HEC01') // Full site details
+                };
+                localStorage.setItem('helexia_incidents', JSON.stringify([exampleIncident]));
+            }
+
+            // Ativar/desativar sidebar
+            document.getElementById('menu-toggle').addEventListener('click', toggleSidebar);
+            document.getElementById('overlay').addEventListener('click', closeSidebar);
+
+            // Funcionalidade de busca
+            document.getElementById('search').addEventListener('input', function () {
+                showSuggestions(this.value);
+            });
+
+            // Fechar sugestões ao clicar fora
+            document.addEventListener('click', function (e) {
+                if (!document.getElementById('search-container').contains(e.target)) {
+                    document.getElementById('suggestions').style.display = 'none';
+                }
+            });
+
+            // Botão flutuante de emergência (WhatsApp)
+            document.getElementById('whatsapp-action').addEventListener('click', openEmergencyModal);
+
+            // Submissão do formulário
+            const form = document.getElementById('incident-form');
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const formData = new FormData(this);
+                    const incident = {
+                        id: 'INC-' + Date.now(),
+                        timestamp: new Date().toISOString(),
+                        operatorName: formData.get('operatorName'),
+                        operatorShift: formData.get('operatorShift'),
+                        incidentSite: formData.get('incidentSite'),
+                        incidentType: formData.get('incidentType'),
+                        incidentDate: formData.get('incidentDate'),
+                        incidentTime: formData.get('incidentTime'),
+                        incidentPriority: formData.get('incidentPriority'),
+                        incidentDescription: formData.get('incidentDescription'),
+                        actionsTaken: formData.get('actionsTaken')
+                    };
+
+                    // Encontrar dados do site para enriquecer o incidente
+                    const siteData = allSites.find(site => site.code === incident.incidentSite);
+                    incident.siteDetails = siteData;
+
+                    currentIncident = incident;
+
+                    // Salvar no localStorage
+                    const incidents = JSON.parse(localStorage.getItem('helexia_incidents') || '[]');
+                    incidents.push(incident);
+                    localStorage.setItem('helexia_incidents', JSON.stringify(incidents));
+
+                    // Mostrar popup de confirmação
+                    showConfirmationPopup(incident);
+
+                    // Fechar modal de registro
+                    closeIncidentModal();
+                });
+            }
+
+            populateSiteOptions();
+        });
+
+        // Fechar modais com ESC
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeIncidentModal();
+                closeConsultModal();
+                closeEmergencyModal();
+                closeConfirmationPopup();
+            }
+        });
+
+        // Fechar modais clicando fora
+        document.addEventListener('click', function (e) {
+            const incidentModal = document.getElementById('incident-modal');
+            const consultModal = document.getElementById('consult-modal');
+            const emergencyModal = document.getElementById('emergency-modal');
+            const confirmationPopup = document.getElementById('confirmation-popup');
+
+            if (e.target === incidentModal) {
+                closeIncidentModal();
+            }
+            if (e.target === consultModal) {
+                closeConsultModal();
+            }
+            if (e.target === emergencyModal) {
+                closeEmergencyModal();
+            }
+            if (e.target === confirmationPopup) {
+                closeConfirmationPopup();
+            }
+        });
+    </script>
+</body>
+
+</html>
